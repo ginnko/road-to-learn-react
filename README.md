@@ -31,3 +31,21 @@
   }
   ````
   代码改变,应用本身会被重新加载,应用的状态会被保持,但是页面不会刷新重载.
+
+- 代码中返回多个元素要包在一个元素中
+  ````
+  list.map(function(item){
+  return (
+    <div>
+      <span><a href={item.url}>{item.title}</a></span>
+      <span>{item.author}</span>
+      <span>{item.num_comments}</span>
+      <span>{item.points}</span>
+    </div>
+  );
+})
+````
+- key属性
+  应该在React中添加一个辅助属性。如此，React在列表发生变化的时候就可以识别其中成员的添加、更改和删除的状态。
+
+  **key值应该是个稳定的值，不能将对象元素的索引作为key值!!!**
