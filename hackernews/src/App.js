@@ -1,98 +1,167 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
 import './App.css';
 
-const list = [
-  {
-    title: 'React',
-    url: 'https://facebook.github.io/react/',
-    author: 'Jordan Walke',
-    num_comments: 3,
-    points: 4,
-    objectID: 0,
-  },
-  {
-    title: 'Redux',
-    url: 'https://github.com/reactjs/redux',
-    author: 'Dan Abramov, Andrew Clark',
-    num_comments: 2,
-    points: 5,
-    objectID: 1,
-  },
-];
+const DEFAULT_QUERY = 'redux';
+const DEFAULT_HPP = '5';
 
+const PATH_BASE = 'https://hn.algolia.com/api/v1';
+const PATH_SEARCH = '/search';
+const PARAM_SEARCH = 'query=';
+const PARAM_PAGE = 'page=';
+const PARAM_HPP = 'hitsPerPage=';
+
+const url = '${PATH_BASE}${PATH_SEATCH}?${PARAM_SEARCH}${DEFAULT_QUERY}';
+
+const isSearched = searchTerm => item => item.title.toLowerCase().includes(searchTerm.toLowerCase());
 
 class App extends Component {
   constructor(props){
     super(props);
     this.state = {
-      list,
+      result: null,
+      searchKey: '',
+      searchTerm: DEFAULT_QUERY,
     };
-    //下面这行代码的作用是让此函数绑定到类，成为类的方法
-    // 下面这行代码中的this分别指向谁？感觉this.onDismiss中的this指向本对象，暂且理解为对本对象中方法的引用好了
-    // 感觉此处bind(this)中的this指的是整个App
+
+    this.setSearchTopStories = this.setSearchTopStories.bind(this);
+    this.fetchSearchTopStories = this.fetchSearchTopStories.bind(this);
     this.onDismiss = this.onDismiss.bind(this);
+    this.onSearchChange = this.onSearchChange.bind(this);
+    this.onSearchSubmit = this.onSearchSubmit.bind(this);
   }
+  
+  onSearchSubmit(event){
+    const { searchTerm } = this.state;
+    this.fetchSearchTopStories(searchTerm);
+    this.setState({searchKey: searchTerm});
+    event.preventDefault();
+  }
+
+  setSearchTopStories(result){
+    const {hits, page} = result;
+    const {searchKey, results} = this.state;
+
+    const oldHits = results && results[searchKey] ? results[searchKey].hits : [];
+    const updatedHits = [...oldHits, ...hits];
+    this.setState({result: {
+      ...results,
+      [searchKey] : {hits: updatedHits, page}
+    }
+  });
+  }
+
+  fetchSearchTopStories(searchTerm, page = 0){
+    fetch(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
+      .then(response => response.json())
+      .then(result => this.setSearchTopStories(result))
+      .catch(e => e);
+  }
+
+  componentDidMount(){
+    const { searchTerm } = this.state;
+    this.setState({searchKey: searchTerm});
+    this.fetchSearchTopStories(searchTerm); 
+  }
+
+  onSearchChange(event){
+    this.setState({searchTerm: event.target.value});
+  }
+
   onDismiss(id){
+    const {searchKey, results} = this.state;
+    const {hits, page} = results[searchKey];
     const isNotId = item => item.objectID !== id;
-    const updatedList = this.state.list.filter(isNotId);
-    this.setState({list: updatedList});
+    const updatedHits = hits.filter(isNotId);
+    this.setState({result: {
+      ...results,
+      [searchKey]: {hits: updatedHits, page}
+    }});
     console.log(this);
   }
   render() {
+    const { searchTerm, results, searchKey } = this.state;
+    const page = (results && results[searchKey] && results[searchKey].page) || 0;
+    const list = (results && results[searchKey] && results[searchKey].hits) || [];
+    console.log(results);
+    // 下面这行代码阻止了组件的显示，因为此时本地状态中的结果为空。
+    if(!results) return null;
     return (
-      <div className="App">
-        {
-          // list.map(function(item){
-          //   return (
-          //     <div key={item.objectID}>
-          //       <span><a href={item.url}>{item.title}</a></span>
-          //       <span>{item.author}</span>
-          //       <span>{item.num_comments}</span>
-          //       <span>{item.points}</span>
-          //     </div>
-          //   );
-          // })
-          this.state.list.map((item) => 
-              <div key={item.objectID}>
-                <span><a href={item.url}>{item.title}</a></span>
-                <span>{item.author}</span>
-                <span>{item.num_comments}</span>
-                <span>{item.points}</span>
-                <span>
-                  <button
-                  // 箭头函数的this默认指向包裹它的对象
-                  // 上面先绑定，到这里和箭头函数啥关系
-                  // 错误的理解：包裹的对象此处是button，如果上面不手动绑定，此处onDismiss函数内部的this指向button
-                    onClick={() => this.onDismiss(item.objectID)}
-                    type="button"
-                  >Dismiss</button>
-                </span>
-              </div>
-              )
-        }
-        <ExplainBindingsComponent />
+      <div className="page">
+      <div className="interactions">
+        <Search 
+          value={searchTerm}
+          onChange={this.onSearchChange}
+          onSubmit={this.onSearchSubmit}
+        >Search
+        </Search>
+      </div>
+        <Table 
+          list={list}
+          // pattern={searchTerm}
+          onDismiss={this.onDismiss}
+        />
+        <div className="interactions">
+          <Button onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>More</Button>
+        </div>
       </div>
     );
   }
 }
-class ExplainBindingsComponent extends Component {
-  constructor(props){
-    super(props);
-    this.onClickMe = this.onClickMe.bind(this);
-  }
-  onClickMe() {
-  console.log(this);
-  }
-  render() {
-  return (
+
+const Search = ({value, onChange, onSubmit, children}) =>
+  <form onSubmit={onSubmit}>
+  <input
+    type="text"
+    value={value}
+    onChange={onChange} 
+  />
+  <button type="submit">{children}</button>
+  </form>;
+
+const largeColumn = {
+  width: '40%',
+};
+
+const midColumn = {
+  width: '30%',
+};
+
+const smallColumn = {
+  width: '10%',
+}
+
+
+
+
+
+const Table = ({list, /*pattern, */onDismiss}) => 
+  <div className="table">
+  {
+    list./*filter(isSearched(pattern)).*/map(item => 
+      <div key={item.objectID} className="table-row">
+        <span style={{largeColumn}}>
+          <a href={item.url}>{item.title}</a>
+        </span>
+        <span style={{midColumn}}>{item.author}</span>
+        <span style={{smallColumn}}>{item.num_comments}</span>
+        <span style={{smallColumn}}>{item.points}</span>
+        <span style={{smallColumn}}>
+          <Button
+            onClick={() => onDismiss(item.objectID)}
+            className="button-inline"
+          >Dismiss</Button>
+          
+        </span>
+      </div>
+    )}
+  </div>;
+
+const Button = ({onClick, className, children}) => 
   <button
-  onClick={this.onClickMe}
+  onClick={onClick}
+  className={className}
   type="button"
-  >
-  Click Me
-  </button>
-  );
-  }
-  }
+  >{children}</button>;
+
+
 export default App;
