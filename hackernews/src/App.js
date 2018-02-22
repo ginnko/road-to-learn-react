@@ -3,6 +3,7 @@ import './App.css';
 import fetch from 'isomorphic-fetch';
 import PropTypes from 'prop-types';
 import {sortBy} from 'lodash';
+import classNames from 'classnames';
 
 const DEFAULT_QUERY = 'redux';
 const DEFAULT_HPP = '5';
@@ -228,6 +229,7 @@ const Table = ({list, sortKey, onSort, onDismiss, isSortReverse}) => {
           sortKey={'TITLE'}
           onSort={onSort}
           activeSortKey={sortKey}
+          isSortReverse={isSortReverse}
         >
         Title 
         </Sort>
@@ -237,6 +239,7 @@ const Table = ({list, sortKey, onSort, onDismiss, isSortReverse}) => {
           sortKey={'AUTHOR'}
           onSort={onSort}
           activeSortKey={sortKey}
+          isSortReverse={isSortReverse}
         >
         Author 
         </Sort>
@@ -246,6 +249,7 @@ const Table = ({list, sortKey, onSort, onDismiss, isSortReverse}) => {
           sortKey={'COMMENTS'}
           onSort={onSort}
           activeSortKey={sortKey}
+          isSortReverse={isSortReverse}
         >
         Comments 
         </Sort>
@@ -255,6 +259,7 @@ const Table = ({list, sortKey, onSort, onDismiss, isSortReverse}) => {
           sortKey={'POINTS'}
           onSort={onSort}
           activeSortKey={sortKey}
+          isSortReverse={isSortReverse}
         >
         Points 
         </Sort>
@@ -296,17 +301,21 @@ Table.propTypes = {
     })
   ).isRequired,
   onDismiss: PropTypes.func.isRequired,
+  sortKey: PropTypes.string.isRequired,
+  onSort: PropTypes.func.isRequired,
+  isSortReverse: PropTypes.bool.isRequired,
 };
 
-const Sort = ({sortKey, onSort, children, activeSortKey}) => {
-  const sortClass = ['button-inline'];
-  if(sortKey === activeSortKey){
-    sortClass.push('button-active');
-  }
+const Sort = ({sortKey, onSort, children, activeSortKey, isSortReverse}) => {
+  const sortClass = classNames(
+    'button-inline',
+    {'button-active': sortKey === activeSortKey}
+  );
+
   return (
     <Button 
       onClick={() => onSort(sortKey)}
-      className={sortClass.join(' ')}
+      className={sortClass}
     >
       {children}
     </Button>
