@@ -1,5 +1,8 @@
 ## react学习之路笔记
 
+**读完用模块重构代码**
+
+
 ### React简介
 - npm init -y:-y 标记将把你的 package.json 内容初始化成默认值
 - 安装react
@@ -297,3 +300,257 @@ const allUsers = [...oldUsers, ...newUsers];
 
 - 客户端缓存
 使用react的setState()方法来实现客户端缓存。
+
+- 错误处理
+本质上错误是React的另一种状态,当一个错误发生时,先将它存在本地状态中,然后利用条件渲染在组件中显示错误信息.
+  1. 在内部状态中引入error
+  2. 使用catch捕获error并使用setState设置给error状态
+  3. 若果错误发生,在render()方法中在本地状态里里获取到error对象,然后利用条件渲染来显示一个错误信息.
+  4. table组件和error信息择一显示
+
+- 模块
+在es6中,可以从模块中导入或导出某些功能.
+这些功能可以是函数,类,组件,常量等.
+
+模块可以是单个文件,也可以是一个带有入口文件的文件夹.
+  - 命名导出
+  ```
+  //file1.js
+  const firstname = 'robin';
+  const lastname = 'wieruch';
+
+  export {firstname, lastname};
+
+  //file2.js
+  import { firstname, lastname } from './file1.js';
+
+  console.log(firstname);
+  ```
+  - 使用对象导入
+  ```
+  //file2.js
+  import * as person from './file1.js';
+  ```
+  - 导入使用别名
+  ```
+  //file2.js
+  import {firstname as foo} from './file1.js';
+  ```
+  - default语句
+    - 为了导出或导入单一功能
+    - 为了强调一个模块输出api中的主要功能
+    - 向后兼容es5只要一个导出物的功能
+    ```
+    const robin = {
+      firstname: 'robin',
+      lastname: 'wieruch',
+    };
+    export default robin;
+    ```
+    在导入default输出时可以省略花括号
+    ```
+    import developer from './file1.js';
+    ```
+- 代码组织
+  - 一种可能的代码结构
+  这种方式会有很多的命名冗余,只有扩展名不同
+    ```
+    src/
+      index.js
+      index.css
+      App.js
+      App.test.js
+      App.css
+      Button.js
+      Button.test.js
+      Button.css
+      Table.js
+      Table.test.js
+      Table.css
+      Search.js
+      Search.test.js
+      Search.css
+    ```
+  - 另一种代码结构
+  index表示是这个文件夹的入口文件.
+  ```
+  src/
+    index.js
+    index.css
+    App/
+      index.js
+      test.js
+      index.css
+    Button/
+      index.js
+      test.js
+      index.css
+    Table/
+      index.js
+      test.js
+      index.css
+    Search/
+      index.js
+      test.js
+      index.css
+  ```
+
+  - 在上述结构基础上将变量抽出
+  ```
+  src/
+    index.js
+    index.css
+    constants/
+      index.js
+    components/
+    App/
+      index.js
+      test.js
+      index..css
+    Button/
+      index.js
+      test.js
+      index..css
+    ...
+
+  // src/constants/index.js
+  export const DEFAULT_QUERY = 'redux';
+  export const DEFAULT_HPP = '5';
+  export const PATH_BASE = 'https://hn.algolia.com/api/v1';
+  export const PATH_SEARCH = '/search';
+  export const PARAM_SEARCH = 'query=';
+  export const PARAM_PAGE = 'page=';
+  export const PARAM_HPP = 'hitsPerPage=';
+
+  //在App/index.js中导入上述变量
+  import {
+    DEFAULT_QUERY,
+    DEFAULT_HPP,
+    PATH_BASE,
+    PATH_SEARCH,
+    PARAM_SEARCH,
+    PARAM_PAGE,
+    PARAM_HPP,
+    } from '../constants/index.js';
+  
+  //如果使用index.js这个命名共识,可以省略index.js
+    import {
+    DEFAULT_QUERY,
+    DEFAULT_HPP,
+    PATH_BASE,
+    PATH_SEARCH,
+    PARAM_SEARCH,
+    PARAM_PAGE,
+    PARAM_HPP,
+    } from '../constants';
+  ```
+  **!!!index文件是一个模块的入口,它描述了一个模块的公共api.外部模块只允许通过index.js文件导入模块中的共享代码!!!**
+  ```
+  //一个index.js的示例
+  import SubmitButton from './SubmitButton';
+  import SaveButton from './SaveButton';
+  import CancelButton from './CancelButton';
+  export {
+    SubmitButton,
+    SaveButton,
+    CancelButton,
+  };
+  ```
+  - 测试
+    - 单元测试: 用来测试一块独立的小块代码.一组单元.
+    - 集成测试: 可以覆盖验证是否这些单元组如预期般工作
+    - 端到端测试: 模拟用户的真实操作
+  
+  - react测试
+    - 组件测试
+    - 快照测试
+  Jest: 测试框架,用来做React的组件测试.
+
+  it块
+  描述了一个测试用例
+
+  descibe块
+  定义一个测试套件,包含一系列关于特定组件的it块
+
+  步骤: 
+    1. 将需要测试的组件从src/App.js中导出
+    2. 在不同的单个文件里去测试
+  
+  具体测试 npm test
+    - componentDidMount()中触发的fetchSearchTopStories()中的fetch不被支持引发错误, 解决办法
+      1. npm install isomorphic-fetch
+      2. app.js中引入 import fetch from 'isomorphic-fetch'
+  
+  快照测试
+  这些测试会生成一份渲染好的组件的快照,用来和未来的快照比对.当未来的一个测试改变,测试就会给出提示.采用这种方式,可以确保DOM保持稳定而不会意外被改变.
+  1. 安装工具库
+    npm install --save-dev react-test-renderer
+  2. 从node包中引入新功能,并将之前测试App组件的it块包裹在一个描述性的describe块中.这个测试套件仅用来测试App组件
+
+  - 单元测试和Enzyme
+  Enzyme是一个测试工具,可以用来断言,操作,遍历React组件,可以用来管理单元测试,在React测试中与快照测试互补
+
+  步骤:
+    1. npm install --save-dev enzyme react-addons-test-utils enzyme-adapter-react-16
+    2. 在测试启动配置中引入node包,并为React初始化这个适配器
+      ```
+      import Enzyme from 'enzyme';
+      import Adapter from 'enzyme-adapter-react-16';
+
+      Enzyme.configure({adapter: new Adapter()});
+    3. 写单元测试
+    使用shallow方法渲染组件,并断言Table有两个子项.断言仅仅检查这个元素两个带有类名叫table-row的元素.
+
+  Enzyme中的渲染方法:shallow(),mount(), render().
+  使用规则:
+    - 不论怎样都优先尝试使用浅渲染( shallow() )
+    - 如果需要测试 componentDidMount() 或 componentDidUpdate() ,使用 mount()
+    - 如果你想测试组件的生命周期和子组件的行为,使用 mount()
+    - 如果你想测试一个组件的子组件的渲染,并且不关心生命周期方法和减少些渲染的
+      花销的话,使用 render()
+
+- 组件接口和propTypes
+一个类型语言更不容易出错,因为代码会根据它的程序文本进行验证.编辑器或者其他工具可以在程序运行之前就捕获这些错误.
+
+React中有一种内建的类型检查器来防止出现Bug,可以使用PropTypes来描述组件接口.所有从父组件传递给子组件的props都会基于子组件的PropTypes接口得到验证.
+
+步骤:
+  1. npm install prop-types
+  2. 在App.js中导入这个包
+  3. 为某个组件的所有参数签名添加一个PropTypes(或者一个具体定义),可选性
+
+基本类型和复杂对象的PropTypes有:
+  - PropTypes.array
+  - PropTypes.bool
+  - PropTypes.func
+  - PropTypes.number
+  - PropTypes.object
+  - PropTypes.string
+  - PropTypes.node
+  - PropTypes.element
+
+可以使用这个包在组件中定义默认props <=> es6默认参数
+
+PropTypes类型检查会在默认props生效后执行校验.
+
+### 高级React组件
+- 在React中与DOM节点交互,ref属性可以让我们访问元素中的一个节点.在无状态组件和es6组件中均可使用.
+
+- 加载
+
+- 高阶组件
+默认以with前缀命名HOC
+
+应用:
+1. 条件渲染
+
+对象展开作为组件输入
+```
+// before you would have to destructure the props before passing them
+const { foo, bar } = props;
+<SomeComponent foo={foo} bar={bar} />
+// but you can use the object spread operator to pass all object properties
+<SomeComponent { ...props } />
+```
+
+- 高级排序

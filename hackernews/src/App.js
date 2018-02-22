@@ -1,26 +1,44 @@
 import React, { Component } from 'react';
 import './App.css';
+import fetch from 'isomorphic-fetch';
+import PropTypes from 'prop-types';
+import {sortBy} from 'lodash';
 
 const DEFAULT_QUERY = 'redux';
 const DEFAULT_HPP = '5';
 
+// const PATH_BASE = 'https://hn.foo.bar.com/api/v1';//test api error
 const PATH_BASE = 'https://hn.algolia.com/api/v1';
 const PATH_SEARCH = '/search';
 const PARAM_SEARCH = 'query=';
 const PARAM_PAGE = 'page=';
 const PARAM_HPP = 'hitsPerPage=';
 
-const url = '${PATH_BASE}${PATH_SEATCH}?${PARAM_SEARCH}${DEFAULT_QUERY}';
+// const url = '${PATH_BASE}${PATH_SEATCH}?${PARAM_SEARCH}${DEFAULT_QUERY}';
 
-const isSearched = searchTerm => item => item.title.toLowerCase().includes(searchTerm.toLowerCase());
+// const isSearched = searchTerm => item => item.title.toLowerCase().includes(searchTerm.toLowerCase());
+
+const SORTS = {
+  NONE: list => list,
+  TITLE: list => sortBy(list, 'title'),
+  AUTHOR: list => sortBy(list, 'author'),
+  COMMENTS: list => sortBy(list, 'num_comments').reverse(),
+  POINTS: list => sortBy(list, 'points').reverse(),
+  };
+
+
 
 class App extends Component {
   constructor(props){
     super(props);
     this.state = {
-      result: null,
+      results: null,
       searchKey: '',
       searchTerm: DEFAULT_QUERY,
+      error: null,
+      isLoading: false,
+      sortKey: 'NONE',
+      isSortReverse: false,
     };
 
     this.setSearchTopStories = this.setSearchTopStories.bind(this);
@@ -28,11 +46,23 @@ class App extends Component {
     this.onDismiss = this.onDismiss.bind(this);
     this.onSearchChange = this.onSearchChange.bind(this);
     this.onSearchSubmit = this.onSearchSubmit.bind(this);
+    this.needsToSearchTopStories = this.needsToSearchTopStories.bind(this);
+    this.onSort = this.onSort.bind(this);
+  }
+
+  onSort(sortKey){
+    const isSortReverse = this.state.sortKey === sortKey && !this.state.isSortReverse;
+    this.setState({sortKey, isSortReverse});
+  }
+  needsToSearchTopStories(searchTerm){
+    return !this.state.results[searchTerm];
   }
   
   onSearchSubmit(event){
     const { searchTerm } = this.state;
-    this.fetchSearchTopStories(searchTerm);
+    if(this.needsToSearchTopStories(searchTerm)){
+      this.fetchSearchTopStories(searchTerm);
+    }
     this.setState({searchKey: searchTerm});
     event.preventDefault();
   }
@@ -43,18 +73,20 @@ class App extends Component {
 
     const oldHits = results && results[searchKey] ? results[searchKey].hits : [];
     const updatedHits = [...oldHits, ...hits];
-    this.setState({result: {
+    this.setState({results: {
       ...results,
       [searchKey] : {hits: updatedHits, page}
-    }
+    },
+    isLoading: false
   });
   }
 
   fetchSearchTopStories(searchTerm, page = 0){
+    this.setState({isLoading: true});
     fetch(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
       .then(response => response.json())
-      .then(result => this.setSearchTopStories(result))
-      .catch(e => e);
+      .then(results => this.setSearchTopStories(results))
+      .catch(e => this.setState({error: e}));
   }
 
   componentDidMount(){
@@ -72,19 +104,17 @@ class App extends Component {
     const {hits, page} = results[searchKey];
     const isNotId = item => item.objectID !== id;
     const updatedHits = hits.filter(isNotId);
-    this.setState({result: {
+    this.setState({results: {
       ...results,
       [searchKey]: {hits: updatedHits, page}
     }});
-    console.log(this);
+    // console.log(this);
   }
   render() {
-    const { searchTerm, results, searchKey } = this.state;
+    const { searchTerm, results, searchKey, error, isLoading, sortKey, isSortReverse } = this.state;
     const page = (results && results[searchKey] && results[searchKey].page) || 0;
     const list = (results && results[searchKey] && results[searchKey].hits) || [];
-    console.log(results);
-    // 下面这行代码阻止了组件的显示，因为此时本地状态中的结果为空。
-    if(!results) return null;
+    // console.log(results);
     return (
       <div className="page">
       <div className="interactions">
@@ -95,28 +125,81 @@ class App extends Component {
         >Search
         </Search>
       </div>
+      {
+        error ? <div className="interaction"><p>Something went wrong.</p></div> : 
         <Table 
           list={list}
-          // pattern={searchTerm}
+          sortKey={sortKey}
+          onSort={this.onSort}
           onDismiss={this.onDismiss}
+          isSortReverse={isSortReverse}
+
         />
+      }
+
         <div className="interactions">
-          <Button onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>More</Button>
+          <ButtonWithLoading
+            isLoading={isLoading}
+            onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}
+          >More</ButtonWithLoading>
         </div>
       </div>
     );
   }
 }
+/*
+class Search extends Component{
+  componentDidMount(){
+    if(this.input){
+      this.input.focus();
+    }
+  }
+  render(){
+    const {
+      value,
+      onChange,
+      onSubmit,
+      children
+    } = this.props;
+    return(
+      <form onSubmit={onSubmit}>
+        <input 
+          type="text"
+          value={value}
+          onChange={onChange}
+          ref={(node) => {this.input = node;}}
+        />
+        <button type="submit">
+          {children}
+        </button>
+      </form>
+    );
+  }
+}
+*/
 
-const Search = ({value, onChange, onSubmit, children}) =>
+const Search = ({value, onChange, onSubmit, children}) => {
+  // let input;
+  return (
   <form onSubmit={onSubmit}>
   <input
     type="text"
     value={value}
     onChange={onChange} 
+    //ref={(node) => input = node}
   />
   <button type="submit">{children}</button>
-  </form>;
+  </form>
+  );
+};
+
+Search.propTypes={
+  value: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+};
+
 
 const largeColumn = {
   width: '40%',
@@ -133,19 +216,64 @@ const smallColumn = {
 
 
 
-
-const Table = ({list, /*pattern, */onDismiss}) => 
+const Table = ({list, sortKey, onSort, onDismiss, isSortReverse}) => {
+  const sortedList = SORTS[sortKey](list);
+  const reverseSortedList = isSortReverse ?
+  sortedList.reverse() : sortedList;
+  return (
   <div className="table">
+    <div className="table-header">
+      <span style={{ ...largeColumn }}>
+        <Sort
+          sortKey={'TITLE'}
+          onSort={onSort}
+          activeSortKey={sortKey}
+        >
+        Title 
+        </Sort>
+      </span>
+      <span style={{ ...midColumn }}>
+        <Sort
+          sortKey={'AUTHOR'}
+          onSort={onSort}
+          activeSortKey={sortKey}
+        >
+        Author 
+        </Sort>
+      </span>
+      <span style={{ ...smallColumn }}>
+        <Sort
+          sortKey={'COMMENTS'}
+          onSort={onSort}
+          activeSortKey={sortKey}
+        >
+        Comments 
+        </Sort>
+      </span>
+      <span style={{ ...smallColumn }}>
+        <Sort
+          sortKey={'POINTS'}
+          onSort={onSort}
+          activeSortKey={sortKey}
+        >
+        Points 
+        </Sort>
+      </span>
+      <span style={{ ...smallColumn }}>
+        Archive
+      </span>
+    </div>
   {
-    list./*filter(isSearched(pattern)).*/map(item => 
-      <div key={item.objectID} className="table-row">
-        <span style={{largeColumn}}>
+
+    reverseSortedList.map(item => 
+      <div key={item.title + item.objectID} className="table-row">
+        <span style={{ ...largeColumn }}>
           <a href={item.url}>{item.title}</a>
         </span>
-        <span style={{midColumn}}>{item.author}</span>
-        <span style={{smallColumn}}>{item.num_comments}</span>
-        <span style={{smallColumn}}>{item.points}</span>
-        <span style={{smallColumn}}>
+        <span style={{ ...midColumn }}>{item.author}</span>
+        <span style={{ ...smallColumn }}>{item.num_comments}</span>
+        <span style={{ ...smallColumn }}>{item.points}</span>
+        <span style={{ ...smallColumn }}>
           <Button
             onClick={() => onDismiss(item.objectID)}
             className="button-inline"
@@ -153,8 +281,39 @@ const Table = ({list, /*pattern, */onDismiss}) =>
           
         </span>
       </div>
-    )}
-  </div>;
+    )
+  }
+  </div>)};
+
+Table.propTypes = {
+  list: PropTypes.arrayOf(
+    PropTypes.shape({
+      objectID: PropTypes.string.isRequired,
+      author: PropTypes.string,
+      url: PropTypes.string,
+      num_comments: PropTypes.number,
+      points: PropTypes.number,
+    })
+  ).isRequired,
+  onDismiss: PropTypes.func.isRequired,
+};
+
+const Sort = ({sortKey, onSort, children, activeSortKey}) => {
+  const sortClass = ['button-inline'];
+  if(sortKey === activeSortKey){
+    sortClass.push('button-active');
+  }
+  return (
+    <Button 
+      onClick={() => onSort(sortKey)}
+      className={sortClass.join(' ')}
+    >
+      {children}
+    </Button>
+  );
+}
+
+
 
 const Button = ({onClick, className, children}) => 
   <button
@@ -163,5 +322,34 @@ const Button = ({onClick, className, children}) =>
   type="button"
   >{children}</button>;
 
+  Button.defaultProps = {
+    className: '',
+  }
+
+  Button.propTypes = {
+    onClick: PropTypes.func.isRequired,
+    className: PropTypes.string,
+    children: PropTypes.node.isRequired,
+  };
+
+const Loading = () => 
+  <div className="fa-3x"><i className="fas fa-spinner fa-pulse"></i></div>;
+
+const withLoading= (Component) => ({isLoading, ...rest}) => isLoading ?
+  <Loading /> : <Component {...rest} />;
+
+const ButtonWithLoading = withLoading(Button);
+
+
+
+
+
 
 export default App;
+
+
+export {
+  Button,
+  Search,
+  Table,
+};
